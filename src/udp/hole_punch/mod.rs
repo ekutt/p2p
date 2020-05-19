@@ -17,8 +17,8 @@ use {Interface, NatError, NatState, NatType, UdpHolePunchInfo};
 mod puncher;
 mod rendezvous_client;
 
-pub type RendezvousFinsih = Box<FnMut(&mut Interface, &Poll, NatType, ::Res<Vec<SocketAddr>>)>;
-pub type HolePunchFinsih = Box<FnMut(&mut Interface, &Poll, ::Res<UdpHolePunchInfo>)>;
+pub type RendezvousFinsih = Box<dyn FnMut(&mut dyn Interface, &Poll, NatType, ::Res<Vec<SocketAddr>>)>;
+pub type HolePunchFinsih = Box<dyn FnMut(&mut dyn Interface, &Poll, ::Res<UdpHolePunchInfo>)>;
 
 enum State {
     None,
@@ -52,7 +52,7 @@ pub struct UdpHolePunchMediator {
 
 impl UdpHolePunchMediator {
     pub fn start(
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         f: RendezvousFinsih,
     ) -> ::Res<Rc<RefCell<Self>>> {
@@ -73,7 +73,7 @@ impl UdpHolePunchMediator {
 
         for sock in socks {
             let weak_cloned = weak.clone();
-            let handler = move |ifc: &mut Interface, poll: &Poll, child, nat_type, res| {
+            let handler = move |ifc: &mut dyn Interface, poll: &Poll, child, nat_type, res| {
                 if let Some(mediator) = weak_cloned.upgrade() {
                     mediator
                         .borrow_mut()
@@ -110,7 +110,7 @@ impl UdpHolePunchMediator {
     // with TCP at the same time too is even rarer.
     fn handle_rendezvous(
         &mut self,
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         child: Token,
         deduced_nat_type: NatType,
@@ -175,7 +175,7 @@ impl UdpHolePunchMediator {
     // give the result back asap, else there will be multiple borrows of the caller
     pub fn rendezvous_timeout(
         &mut self,
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
     ) -> ::Res<(Vec<SocketAddr>, NatType)> {
         debug!("Timeout for UDP Rendezvous");
@@ -225,7 +225,7 @@ impl UdpHolePunchMediator {
 
     pub fn punch_hole(
         &mut self,
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         peers: Vec<SocketAddr>,
         peer_enc_pk: &box_::PublicKey,
@@ -249,7 +249,7 @@ impl UdpHolePunchMediator {
             .zip(hole_punchers_cfg.into_iter())
         {
             let weak = self.self_weak.clone();
-            let handler = move |ifc: &mut Interface, poll: &Poll, token, res| {
+            let handler = move |ifc: &mut dyn Interface, poll: &Poll, token, res| {
                 if let Some(mediator) = weak.upgrade() {
                     mediator
                         .borrow_mut()
@@ -287,7 +287,7 @@ impl UdpHolePunchMediator {
 
     fn handle_hole_punch(
         &mut self,
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         child: Token,
         res: ::Res<(UdpSock, SocketAddr, u32, u32, Duration)>,
@@ -343,7 +343,7 @@ impl UdpHolePunchMediator {
         }
     }
 
-    fn terminate_children(ifc: &mut Interface, poll: &Poll, children: &mut HashSet<Token>) {
+    fn terminate_children(ifc: &mut dyn Interface, poll: &Poll, children: &mut HashSet<Token>) {
         for child in children.drain() {
             let child = match ifc.state(child) {
                 Some(state) => state,
@@ -362,7 +362,7 @@ impl UdpHolePunchMediator {
 }
 
 impl NatState for UdpHolePunchMediator {
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         match self.state {
             State::Rendezvous {
                 ref mut children,
@@ -384,7 +384,7 @@ impl NatState for UdpHolePunchMediator {
         }
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

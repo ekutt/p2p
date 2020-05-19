@@ -17,19 +17,18 @@ mio-extras = "~2.0.5"
 net2 = "~0.2.30"
 quick-error = "~1.2.0"
 rand = "~0.3.16"
-rust_sodium = "~0.5.0"
+rust_sodium = "~0.10.2"
 serde = "~1.0.11"
 serde_derive = "~1.0.11"
-unwrap = "~1.1.0"
+unwrap = "~1.2.1"
 
 [dependencies.socket-collection]
-version = "~0.3.0"
-#git = "https://github.com/maidsafe/socket-collection"
-#branch = "community-release-1"
+version = "~0.4.0"
+git = "https://github.com/nblockchain/socket-collection"
 
 [dev-dependencies]
 env_logger = "~0.5.13"
-maidsafe_utilities = "~0.15.0"
+maidsafe_utilities = "~0.18.0"
 serde_json = "~1.0.2"
 
 #[features]

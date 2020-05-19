@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use tcp::new_reusably_bound_tcp_sockets;
 use {Interface, NatError, NatState, NatTimer};
 
-pub type Finish = Box<FnMut(&mut Interface, &Poll, Token, ::Res<(TcpSock, Duration)>)>;
+pub type Finish = Box<dyn FnMut(&mut dyn Interface, &Poll, Token, ::Res<(TcpSock, Duration)>)>;
 
 pub enum Via {
     Connect {
@@ -46,7 +46,7 @@ pub struct Puncher {
 
 impl Puncher {
     pub fn start(
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         via: Via,
         peer_enc_pk: &box_::PublicKey,
@@ -111,7 +111,7 @@ impl Puncher {
         Ok(token)
     }
 
-    fn read(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn read(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let mut ok = false;
         loop {
             match self.sock.read::<Vec<u8>>() {
@@ -153,7 +153,7 @@ impl Puncher {
         }
     }
 
-    fn write(&mut self, ifc: &mut Interface, poll: &Poll, m: Option<Vec<u8>>) {
+    fn write(&mut self, ifc: &mut dyn Interface, poll: &Poll, m: Option<Vec<u8>>) {
         match self.sock.write(m.map(|m| (m, 0))) {
             Ok(true) => self.done(ifc, poll),
             Ok(false) => (),
@@ -164,7 +164,7 @@ impl Puncher {
         }
     }
 
-    fn done(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn done(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         if let Some(t) = self.timeout.take() {
             let _ = ifc.cancel_timeout(&t);
         }
@@ -174,7 +174,7 @@ impl Puncher {
         (*self.f)(ifc, poll, self.token, Ok((sock, dur)));
     }
 
-    fn handle_err(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn handle_err(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         if self.via_accept {
             self.terminate(ifc, poll);
             (*self.f)(ifc, poll, self.token, Err(NatError::TcpHolePunchFailed));
@@ -203,7 +203,7 @@ impl Puncher {
 }
 
 impl NatState for Puncher {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_readable() {
             self.read(ifc, poll)
         } else if event.is_writable() {
@@ -234,7 +234,7 @@ impl NatState for Puncher {
         }
     }
 
-    fn timeout(&mut self, ifc: &mut Interface, poll: &Poll, timer_id: u8) {
+    fn timeout(&mut self, ifc: &mut dyn Interface, poll: &Poll, timer_id: u8) {
         if timer_id != TIMER_ID {
             debug!("Invalid timer id: {}", timer_id);
         }
@@ -262,7 +262,7 @@ impl NatState for Puncher {
         }
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         if let Some(t) = self.timeout.take() {
             let _ = ifc.cancel_timeout(&t);
         }
@@ -270,7 +270,7 @@ impl NatState for Puncher {
         let _ = poll.deregister(&self.sock);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

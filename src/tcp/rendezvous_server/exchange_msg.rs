@@ -22,7 +22,7 @@ pub struct ExchangeMsg {
 }
 
 impl ExchangeMsg {
-    pub fn start(ifc: &mut Interface, poll: &Poll, peer: SocketAddr, sock: TcpSock) -> ::Res<()> {
+    pub fn start(ifc: &mut dyn Interface, poll: &Poll, peer: SocketAddr, sock: TcpSock) -> ::Res<()> {
         let token = ifc.new_token();
 
         let timeout = ifc.set_timeout(
@@ -53,7 +53,7 @@ impl ExchangeMsg {
         }
     }
 
-    fn read(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn read(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let mut pk = None;
         loop {
             match self.sock.read() {
@@ -82,7 +82,7 @@ impl ExchangeMsg {
         }
     }
 
-    fn write(&mut self, ifc: &mut Interface, poll: &Poll, m: Option<TcpEchoResp>) {
+    fn write(&mut self, ifc: &mut dyn Interface, poll: &Poll, m: Option<TcpEchoResp>) {
         match self.sock.write(m.map(|m| (m, 0))) {
             Ok(true) => (),
             Ok(false) => return,
@@ -95,7 +95,7 @@ impl ExchangeMsg {
 }
 
 impl NatState for ExchangeMsg {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_readable() {
             self.read(ifc, poll)
         } else if event.is_writable() {
@@ -105,7 +105,7 @@ impl NatState for ExchangeMsg {
         }
     }
 
-    fn timeout(&mut self, ifc: &mut Interface, poll: &Poll, timer_id: u8) {
+    fn timeout(&mut self, ifc: &mut dyn Interface, poll: &Poll, timer_id: u8) {
         if timer_id != TIMER_ID {
             debug!("Invalid Timer ID: {}", timer_id);
         }
@@ -113,13 +113,13 @@ impl NatState for ExchangeMsg {
         self.terminate(ifc, poll)
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.cancel_timeout(&self.timeout);
         let _ = ifc.remove_state(self.token);
         let _ = poll.deregister(&self.sock);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

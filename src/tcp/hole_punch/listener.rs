@@ -19,7 +19,7 @@ pub struct Listener {
 
 impl Listener {
     pub fn start(
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         l: TcpListener,
         peer_enc_key: &box_::PublicKey,
@@ -51,7 +51,7 @@ impl Listener {
         }
     }
 
-    fn accept(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn accept(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         match self.listener.accept() {
             Ok((s, _)) => {
                 self.terminate(ifc, poll);
@@ -69,7 +69,7 @@ impl Listener {
         }
     }
 
-    fn handle_err(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn handle_err(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         self.terminate(ifc, poll);
         if let Some(ref mut f) = self.f {
             f(ifc, poll, self.token, Err(NatError::TcpHolePunchFailed));
@@ -78,7 +78,7 @@ impl Listener {
 }
 
 impl NatState for Listener {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_error() || event.is_hup() {
             let e = match self.listener.take_error() {
                 Ok(err) => err.map_or(NatError::Unknown, NatError::from),
@@ -93,12 +93,12 @@ impl NatState for Listener {
         }
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
         let _ = poll.deregister(&self.listener);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

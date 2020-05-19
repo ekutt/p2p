@@ -9,7 +9,7 @@ use std::str::{self, FromStr};
 use tcp::{TcpEchoReq, TcpEchoResp};
 use {Interface, NatError, NatState};
 
-pub type Finish = Box<FnMut(&mut Interface, &Poll, Token, ::Res<SocketAddr>)>;
+pub type Finish = Box<dyn FnMut(&mut dyn Interface, &Poll, Token, ::Res<SocketAddr>)>;
 
 pub struct TcpRendezvousClient {
     token: Token,
@@ -19,7 +19,7 @@ pub struct TcpRendezvousClient {
 }
 
 impl TcpRendezvousClient {
-    pub fn start(ifc: &mut Interface, poll: &Poll, sock: TcpSock, f: Finish) -> ::Res<Token> {
+    pub fn start(ifc: &mut dyn Interface, poll: &Poll, sock: TcpSock, f: Finish) -> ::Res<Token> {
         let token = ifc.new_token();
 
         poll.register(
@@ -45,7 +45,7 @@ impl TcpRendezvousClient {
         }
     }
 
-    fn read(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn read(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let mut utf8 = Vec::new();
         loop {
             match self.sock.read() {
@@ -99,26 +99,26 @@ impl TcpRendezvousClient {
         }
     }
 
-    fn write(&mut self, ifc: &mut Interface, poll: &Poll, m: Option<TcpEchoReq>) {
+    fn write(&mut self, ifc: &mut dyn Interface, poll: &Poll, m: Option<TcpEchoReq>) {
         if let Err(e) = self.sock.write(m.map(|m| (m, 0))) {
             debug!("Tcp Rendezvous client errored out in write: {:?}", e);
             self.handle_err(ifc, poll);
         }
     }
 
-    fn done(&mut self, ifc: &mut Interface, poll: &Poll, ext_addr: SocketAddr) {
+    fn done(&mut self, ifc: &mut dyn Interface, poll: &Poll, ext_addr: SocketAddr) {
         self.terminate(ifc, poll);
         (*self.f)(ifc, poll, self.token, Ok(ext_addr));
     }
 
-    fn handle_err(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn handle_err(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         self.terminate(ifc, poll);
         (*self.f)(ifc, poll, self.token, Err(NatError::TcpRendezvousFailed));
     }
 }
 
 impl NatState for TcpRendezvousClient {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_readable() {
             self.read(ifc, poll)
         } else if event.is_writable() {
@@ -129,12 +129,12 @@ impl NatState for TcpRendezvousClient {
         }
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
         let _ = poll.deregister(&self.sock);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

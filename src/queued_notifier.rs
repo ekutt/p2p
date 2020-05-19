@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use {Interface, NatError, NatMsg, NatState};
 
-type Func<UserData> = Box<FnMut(&mut Interface, &Poll, UserData) + 'static>;
+type Func<UserData> = Box< dyn FnMut(&mut dyn Interface, &Poll, UserData) + 'static>;
 
 /// Fire Queued Requests.
 ///
@@ -159,10 +159,10 @@ where
     /// Construct a `QueuedNotifier`. The observer is the given callback.
     pub fn new<F>(f: F) -> Self
     where
-        F: FnOnce(&mut Interface, &Poll, UserData) + 'static,
+        F: FnOnce(&mut dyn Interface, &Poll, UserData) + 'static,
     {
         let mut invaiant_f = Some(f);
-        let f = Box::new(move |ifc: &mut Interface, poll: &Poll, user_data| {
+        let f = Box::new(move |ifc: &mut dyn Interface, poll: &Poll, user_data| {
             let f = unwrap!(invaiant_f.take());
             f(ifc, poll, user_data)
         });
@@ -171,7 +171,7 @@ where
     }
 
     /// Notify the observer but not immediately; rather in the subsequent runs of the eventloop.
-    pub fn notify(&mut self, ifc: &mut Interface, user_data: UserData) -> ::Res<()> {
+    pub fn notify(&mut self, ifc: &mut dyn Interface, user_data: UserData) -> ::Res<()> {
         if let Some(f) = self.f.take() {
             QueuedNotifierImpl::initiate(ifc, user_data, f);
             Ok(())
@@ -182,7 +182,7 @@ where
 
     /// Notify the observer but not immediately; rather in the subsequent runs of the eventloop.
     /// It'll internally log a warning if any error is encountered instead of returning one.
-    pub fn notify_or_warn(&mut self, ifc: &mut Interface, user_data: UserData) {
+    pub fn notify_or_warn(&mut self, ifc: &mut dyn Interface, user_data: UserData) {
         if let Err(e) = self.notify(ifc, user_data) {
             warn!("Error notifying: {:?}", e);
         }
@@ -198,7 +198,7 @@ impl<UserData> QueuedNotifierImpl<UserData>
 where
     UserData: 'static,
 {
-    fn initiate(ifc: &mut Interface, user_data: UserData, f: Func<UserData>) {
+    fn initiate(ifc: &mut dyn Interface, user_data: UserData, f: Func<UserData>) {
         let token = ifc.new_token();
 
         let state = Rc::new(RefCell::new(QueuedNotifierImpl {
@@ -234,14 +234,14 @@ impl<UserData> NatState for QueuedNotifierImpl<UserData>
 where
     UserData: 'static,
 {
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
 
         let (user_data, mut f) = unwrap!(self.invariant.take());
         f(ifc, poll, user_data)
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

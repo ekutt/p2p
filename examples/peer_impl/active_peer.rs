@@ -223,7 +223,7 @@ impl CoreState for ActivePeer {
         let _ = self.tx.send(Event::PeerDisconnected(self.peer.clone()));
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

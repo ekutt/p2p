@@ -225,9 +225,6 @@
     missing_docs,
     non_shorthand_field_patterns,
     overflowing_literals,
-    plugin_as_library,
-    private_no_mangle_fns,
-    private_no_mangle_statics,
     stable_features,
     unconditional_recursion,
     unknown_lints,
@@ -355,15 +352,15 @@ impl NatTimer {
 /// [`mio_extras::channel::Sender`][0].
 ///
 /// [0]: http://rust-doc.s3-website-us-east-1.amazonaws.com/mio/master/mio/channel
-pub struct NatMsg(Box<FnMut(&mut Interface, &Poll) + Send + 'static>);
+pub struct NatMsg(Box<dyn FnMut(&mut dyn Interface, &Poll) + Send + 'static>);
 impl NatMsg {
     /// Construct a new message indicating the action via a function/functor.
     pub fn new<F>(f: F) -> Self
     where
-        F: FnOnce(&mut Interface, &Poll) + Send + 'static,
+        F: FnOnce(&mut dyn Interface, &Poll) + Send + 'static,
     {
         let mut f = Some(f);
-        NatMsg(Box::new(move |ifc: &mut Interface, poll: &Poll| {
+        NatMsg(Box::new(move |ifc: &mut dyn Interface, poll: &Poll| {
             if let Some(f) = f.take() {
                 f(ifc, poll)
             }
@@ -371,7 +368,7 @@ impl NatMsg {
     }
 
     /// Execute the message (and thus the action).
-    pub fn invoke(mut self, ifc: &mut Interface, poll: &Poll) {
+    pub fn invoke(mut self, ifc: &mut dyn Interface, poll: &Poll) {
         (self.0)(ifc, poll)
     }
 }
@@ -382,16 +379,16 @@ impl NatMsg {
 /// and indicate what event was fired for us in poll.
 pub trait NatState {
     /// To be called when readiness event has fired
-    fn ready(&mut self, &mut Interface, &Poll, Ready) {}
+    fn ready(&mut self, &mut dyn Interface, &Poll, Ready) {}
     /// To be called when user wants to actively terminate this state. It will do all the necessary
     /// clean ups and resource (file/socket descriptors) cleaning freeing so merely calling this is
     /// sufficient.
-    fn terminate(&mut self, &mut Interface, &Poll) {}
+    fn terminate(&mut self, &mut dyn Interface, &Poll) {}
     /// To be called when timeout has been fired and the user has retrieved the state using the
     /// token stored inside the `NatTimer::associated_nat_state`.
-    fn timeout(&mut self, &mut Interface, &Poll, u8) {}
+    fn timeout(&mut self, &mut dyn Interface, &Poll, u8) {}
     /// This is for internal use for the crate and is rarely needed.
-    fn as_any(&mut self) -> &mut Any;
+    fn as_any(&mut self) -> &mut dyn Any;
 }
 
 /// The main trait that our users should implement.
@@ -407,13 +404,13 @@ pub trait Interface {
     fn insert_state(
         &mut self,
         token: Token,
-        state: Rc<RefCell<NatState>>,
-    ) -> Result<(), (Rc<RefCell<NatState>>, String)>;
+        state: Rc<RefCell<dyn NatState>>,
+    ) -> Result<(), (Rc<RefCell<dyn NatState>>, String)>;
     /// Remove the state that was previously stored against the `token` and return it if
     /// successfully retrieved.
-    fn remove_state(&mut self, token: Token) -> Option<Rc<RefCell<NatState>>>;
+    fn remove_state(&mut self, token: Token) -> Option<Rc<RefCell<dyn NatState>>>;
     /// Return the state (without removing - just a query) associated with the `token`
-    fn state(&mut self, token: Token) -> Option<Rc<RefCell<NatState>>>;
+    fn state(&mut self, token: Token) -> Option<Rc<RefCell<dyn NatState>>>;
     /// Set timeout. User code is expected to have a `mio_extras::timer::Timer<NatTimer>` on which
     /// the timeout can be set.
     fn set_timeout(&mut self, duration: Duration, timer_detail: NatTimer) -> Timeout;
@@ -433,7 +430,7 @@ pub trait Interface {
     /// Obtain a sender for use to send messages into event loop.
     fn sender(&self) -> &Sender<NatMsg>;
     /// For downcasting to the concrete type when necessary
-    fn as_any(&mut self) -> &mut Any;
+    fn as_any(&mut self) -> &mut dyn Any;
 }
 
 /// General wire format for encrypted communication

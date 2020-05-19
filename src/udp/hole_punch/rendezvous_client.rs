@@ -11,7 +11,7 @@ use std::str::{self, FromStr};
 use udp::{UdpEchoReq, UdpEchoResp};
 use {Interface, NatError, NatState, NatType};
 
-pub type Finish = Box<FnMut(&mut Interface, &Poll, Token, NatType, ::Res<(UdpSock, SocketAddr)>)>;
+pub type Finish = Box<dyn FnMut(&mut dyn Interface, &Poll, Token, NatType, ::Res<(UdpSock, SocketAddr)>)>;
 
 /// UDP rendezvous client that queries the server for it's public endpoint - IP:port.
 pub struct UdpRendezvousClient {
@@ -27,7 +27,7 @@ pub struct UdpRendezvousClient {
 
 impl UdpRendezvousClient {
     /// Starts sending queries to multiple servers. Servers are retrieved from `ifc.config()`.
-    pub fn start(ifc: &mut Interface, poll: &Poll, sock: UdpSock, f: Finish) -> ::Res<Token> {
+    pub fn start(ifc: &mut dyn Interface, poll: &Poll, sock: UdpSock, f: Finish) -> ::Res<Token> {
         let token = ifc.new_token();
         let mut servers = ifc.config().remote_udp_rendezvous_servers.clone();
         let num_servers = servers.len();
@@ -72,7 +72,7 @@ impl UdpRendezvousClient {
         }
     }
 
-    fn read(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn read(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let mut cipher_text = Vec::with_capacity(64);
         loop {
             match self.sock.read() {
@@ -128,14 +128,14 @@ impl UdpRendezvousClient {
         }
     }
 
-    fn write(&mut self, ifc: &mut Interface, poll: &Poll, m: Option<UdpEchoReq>) {
+    fn write(&mut self, ifc: &mut dyn Interface, poll: &Poll, m: Option<UdpEchoReq>) {
         if let Err(e) = self.sock.write(m.map(|m| (m, 0))) {
             debug!("Udp Rendezvous Client has errored out in write: {:?}", e);
             self.handle_err(ifc, poll, None)
         }
     }
 
-    fn done(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn done(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
 
         let mut ext_addr = match self.our_ext_addrs.pop() {
@@ -193,7 +193,7 @@ impl UdpRendezvousClient {
         (*self.f)(ifc, poll, self.token, nat_type, Ok((s, ext_addr)));
     }
 
-    fn handle_err(&mut self, ifc: &mut Interface, poll: &Poll, nat_type: Option<NatType>) {
+    fn handle_err(&mut self, ifc: &mut dyn Interface, poll: &Poll, nat_type: Option<NatType>) {
         self.terminate(ifc, poll);
         (*self.f)(
             ifc,
@@ -206,7 +206,7 @@ impl UdpRendezvousClient {
 }
 
 impl NatState for UdpRendezvousClient {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_readable() {
             self.read(ifc, poll)
         } else if event.is_writable() {
@@ -228,12 +228,12 @@ impl NatState for UdpRendezvousClient {
         }
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
         let _ = poll.deregister(&self.sock);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

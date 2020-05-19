@@ -22,8 +22,8 @@ mod listener;
 mod puncher;
 mod rendezvous_client;
 
-pub type RendezvousFinsih = Box<FnMut(&mut Interface, &Poll, NatType, ::Res<SocketAddr>)>;
-pub type HolePunchFinsih = Box<FnMut(&mut Interface, &Poll, ::Res<TcpHolePunchInfo>)>;
+pub type RendezvousFinsih = Box<dyn FnMut(&mut dyn Interface, &Poll, NatType, ::Res<SocketAddr>)>;
+pub type HolePunchFinsih = Box<dyn FnMut(&mut dyn Interface, &Poll, ::Res<TcpHolePunchInfo>)>;
 
 const LISTENER_BACKLOG: i32 = 100;
 
@@ -58,7 +58,7 @@ pub struct TcpHolePunchMediator {
 
 impl TcpHolePunchMediator {
     pub fn start(
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         f: RendezvousFinsih,
     ) -> ::Res<Rc<RefCell<Self>>> {
@@ -97,7 +97,7 @@ impl TcpHolePunchMediator {
             };
 
             let weak_cloned = weak.clone();
-            let handler = move |ifc: &mut Interface, poll: &Poll, child, res| {
+            let handler = move |ifc: &mut dyn Interface, poll: &Poll, child, res| {
                 if let Some(mediator) = weak_cloned.upgrade() {
                     mediator
                         .borrow_mut()
@@ -126,7 +126,7 @@ impl TcpHolePunchMediator {
 
     fn handle_rendezvous(
         &mut self,
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         child: Token,
         res: &::Res<SocketAddr>,
@@ -249,7 +249,7 @@ impl TcpHolePunchMediator {
         Ok(ext_addr)
     }
 
-    pub fn rendezvous_timeout(&mut self, ifc: &mut Interface, poll: &Poll) -> NatError {
+    pub fn rendezvous_timeout(&mut self, ifc: &mut dyn Interface, poll: &Poll) -> NatError {
         debug!("Timeout for TCP Rendezvous");
         let e = match self.state {
             State::Rendezvous { .. } => NatError::TcpRendezvousFailed,
@@ -269,7 +269,7 @@ impl TcpHolePunchMediator {
 
     pub fn punch_hole(
         &mut self,
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         peer: SocketAddr,
         peer_enc_pk: &box_::PublicKey,
@@ -289,7 +289,7 @@ impl TcpHolePunchMediator {
         let mut children = HashSet::with_capacity(2);
 
         let weak = self.self_weak.clone();
-        let handler = move |ifc: &mut Interface, poll: &Poll, token, res| {
+        let handler = move |ifc: &mut dyn Interface, poll: &Poll, token, res| {
             if let Some(mediator) = weak.upgrade() {
                 mediator
                     .borrow_mut()
@@ -305,7 +305,7 @@ impl TcpHolePunchMediator {
         }
 
         let weak = self.self_weak.clone();
-        let handler = move |ifc: &mut Interface, poll: &Poll, token, res| {
+        let handler = move |ifc: &mut dyn Interface, poll: &Poll, token, res| {
             if let Some(mediator) = weak.upgrade() {
                 mediator
                     .borrow_mut()
@@ -329,7 +329,7 @@ impl TcpHolePunchMediator {
 
     fn handle_hole_punch(
         &mut self,
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         child: Token,
         res: ::Res<(TcpSock, Duration)>,
@@ -374,7 +374,7 @@ impl TcpHolePunchMediator {
         }
     }
 
-    fn terminate_children(ifc: &mut Interface, poll: &Poll, children: &mut HashSet<Token>) {
+    fn terminate_children(ifc: &mut dyn Interface, poll: &Poll, children: &mut HashSet<Token>) {
         for child in children.drain() {
             let child = match ifc.state(child) {
                 Some(state) => state,
@@ -387,7 +387,7 @@ impl TcpHolePunchMediator {
 }
 
 impl NatState for TcpHolePunchMediator {
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         match self.state {
             State::Rendezvous {
                 ref mut children, ..
@@ -401,7 +401,7 @@ impl NatState for TcpHolePunchMediator {
         }
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

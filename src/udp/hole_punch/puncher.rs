@@ -12,7 +12,7 @@ use {Interface, NatError, NatState, NatTimer};
 
 // Result of (UdpSock, peer, starting_ttl, ttl_on_being_reached, duration-of-hole-punch)
 pub type Finish =
-    Box<FnMut(&mut Interface, &Poll, Token, ::Res<(UdpSock, SocketAddr, u32, u32, Duration)>)>;
+    Box<dyn FnMut(&mut dyn Interface, &Poll, Token, ::Res<(UdpSock, SocketAddr, u32, u32, Duration)>)>;
 
 const TIMER_ID: u8 = 0;
 const SYN: &[u8] = b"SYN";
@@ -50,7 +50,7 @@ pub struct Puncher {
 
 impl Puncher {
     pub fn start(
-        ifc: &mut Interface,
+        ifc: &mut dyn Interface,
         poll: &Poll,
         token: Token,
         mut sock: UdpSock,
@@ -112,7 +112,7 @@ impl Puncher {
         Ok(())
     }
 
-    fn read(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn read(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let mut cipher_text = Vec::new();
         loop {
             match self.sock.read() {
@@ -190,7 +190,7 @@ impl Puncher {
         self.continue_handshake(ifc, poll);
     }
 
-    fn write(&mut self, ifc: &mut Interface, poll: &Poll, m: Option<Vec<u8>>) {
+    fn write(&mut self, ifc: &mut dyn Interface, poll: &Poll, m: Option<Vec<u8>>) {
         match self.sock.write(m.map(|m| (m, 0))) {
             Ok(true) => self.on_successful_send(ifc, poll),
             Ok(false) => (),
@@ -203,7 +203,7 @@ impl Puncher {
         }
     }
 
-    fn continue_handshake(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn continue_handshake(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let msg = {
             let m = match self.sending {
                 Sending::Syn => SYN,
@@ -235,7 +235,7 @@ impl Puncher {
         self.write(ifc, poll, Some(msg));
     }
 
-    fn on_successful_send(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn on_successful_send(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         match self.sending {
             Sending::Ack => if self.num_acks_transmitted == MAX_ACK_RETRANSMISSIONS {
                 trace!("{} Sent all ACKs - we are done", self);
@@ -249,7 +249,7 @@ impl Puncher {
         }
     }
 
-    fn done(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn done(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
         let _ = ifc.cancel_timeout(&self.timeout);
         let s = mem::replace(&mut self.sock, Default::default());
@@ -267,14 +267,14 @@ impl Puncher {
         );
     }
 
-    fn handle_err(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn handle_err(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         self.terminate(ifc, poll);
         (*self.f)(ifc, poll, self.token, Err(NatError::UdpHolePunchFailed));
     }
 }
 
 impl NatState for Puncher {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_readable() {
             self.read(ifc, poll)
         } else if event.is_writable() {
@@ -287,7 +287,7 @@ impl NatState for Puncher {
         }
     }
 
-    fn timeout(&mut self, ifc: &mut Interface, poll: &Poll, timer_id: u8) {
+    fn timeout(&mut self, ifc: &mut dyn Interface, poll: &Poll, timer_id: u8) {
         if timer_id != TIMER_ID {
             warn!("{} Invalid Timer ID: {}", self, timer_id);
         }
@@ -317,7 +317,7 @@ impl NatState for Puncher {
         self.continue_handshake(ifc, poll)
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
         let _ = ifc.cancel_timeout(&self.timeout);
         let _ = poll.deregister(&self.sock);
@@ -325,7 +325,7 @@ impl NatState for Puncher {
         trace!("{} terminated", self);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

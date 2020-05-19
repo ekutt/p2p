@@ -32,7 +32,7 @@ impl UdpRendezvousServer {
     /// # Returns
     ///
     /// A tuple of mio token associated with the rendezvous server and local listen address.
-    pub fn start(ifc: &mut Interface, poll: &Poll) -> ::Res<(Token, SocketAddr)> {
+    pub fn start(ifc: &mut dyn Interface, poll: &Poll) -> ::Res<(Token, SocketAddr)> {
         let port = ifc
             .config()
             .udp_rendezvous_port
@@ -64,7 +64,7 @@ impl UdpRendezvousServer {
         }
     }
 
-    fn read_frm(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn read_frm(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let mut peers = Vec::new();
         loop {
             match self.sock.read_frm() {
@@ -91,7 +91,7 @@ impl UdpRendezvousServer {
         }
     }
 
-    fn write_to(&mut self, ifc: &mut Interface, poll: &Poll, m: Option<(UdpEchoResp, SocketAddr)>) {
+    fn write_to(&mut self, ifc: &mut dyn Interface, poll: &Poll, m: Option<(UdpEchoResp, SocketAddr)>) {
         match self.sock.write_to(m.map(|(m, s)| (m, s, 0))) {
             Ok(_) => (),
             Err(e) => {
@@ -103,7 +103,7 @@ impl UdpRendezvousServer {
 }
 
 impl NatState for UdpRendezvousServer {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_readable() {
             self.read_frm(ifc, poll)
         } else if event.is_writable() {
@@ -113,13 +113,13 @@ impl NatState for UdpRendezvousServer {
         }
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
         let _ = poll.deregister(&self.sock);
         self.terminated = true;
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -171,7 +171,7 @@ mod tests {
 
         unwrap!(client_el.nat_tx.send(NatMsg::new(move |ifc, poll| {
             let on_done = Box::new(
-                move |_ifc: &mut Interface,
+                move |_ifc: &mut dyn Interface,
                       _poll: &Poll,
                       _child,
                       _nat_type,

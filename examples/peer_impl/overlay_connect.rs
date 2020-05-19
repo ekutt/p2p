@@ -117,7 +117,7 @@ impl OverlayConnect {
 
         if let PeerState::Discovered = *stored_state {
             let weak = self.self_weak.clone();
-            let handler = move |ifc: &mut Interface, poll: &Poll, (nat_info, res)| {
+            let handler = move |ifc: &mut dyn Interface, poll: &Poll, (nat_info, res)| {
                 if let Some(overlay_connect) = weak.upgrade() {
                     if let Some(core) = ifc.as_any().downcast_mut::<Core>() {
                         overlay_connect
@@ -354,7 +354,7 @@ impl OverlayConnect {
             PeerState::AwaitingPeerRendezvous { p2p_handle, .. } => {
                 let mediator_token = p2p_handle.mediator_token();
                 let weak = self.self_weak.clone();
-                let handler = move |ifc: &mut Interface, poll: &Poll, res| {
+                let handler = move |ifc: &mut dyn Interface, poll: &Poll, res| {
                     if let Some(overlay_connect) = weak.upgrade() {
                         if let Some(core) = ifc.as_any().downcast_mut::<Core>() {
                             overlay_connect
@@ -376,7 +376,7 @@ impl OverlayConnect {
             }
             PeerState::Discovered => {
                 let weak = self.self_weak.clone();
-                let handler = move |ifc: &mut Interface, poll: &Poll, (nat_info, res)| {
+                let handler = move |ifc: &mut dyn Interface, poll: &Poll, (nat_info, res)| {
                     if let Some(overlay_connect) = weak.upgrade() {
                         if let Some(core) = ifc.as_any().downcast_mut::<Core>() {
                             overlay_connect
@@ -464,7 +464,7 @@ impl OverlayConnect {
                     if let Some(peer_info) = peer_info {
                         let mediator_token = p2p_handle.mediator_token();
                         let weak = self.self_weak.clone();
-                        let handler = move |ifc: &mut Interface, poll: &Poll, res| {
+                        let handler = move |ifc: &mut dyn Interface, poll: &Poll, res| {
                             if let Some(overlay_connect) = weak.upgrade() {
                                 if let Some(core) = ifc.as_any().downcast_mut::<Core>() {
                                     overlay_connect
@@ -624,7 +624,7 @@ impl CoreState for OverlayConnect {
         let _ = core.remove_peer_state(self.token);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

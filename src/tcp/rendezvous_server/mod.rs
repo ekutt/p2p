@@ -31,7 +31,7 @@ pub struct TcpRendezvousServer {
 
 impl TcpRendezvousServer {
     /// Boot the TCP Rendezvous server. This should normally be called only once.
-    pub fn start(ifc: &mut Interface, poll: &Poll) -> ::Res<Token> {
+    pub fn start(ifc: &mut dyn Interface, poll: &Poll) -> ::Res<Token> {
         let listener = {
             let port = ifc
                 .config()
@@ -64,7 +64,7 @@ impl TcpRendezvousServer {
         }
     }
 
-    fn accept(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn accept(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         loop {
             match self.listener.accept() {
                 Ok((socket, peer)) => {
@@ -87,7 +87,7 @@ impl TcpRendezvousServer {
 }
 
 impl NatState for TcpRendezvousServer {
-    fn ready(&mut self, ifc: &mut Interface, poll: &Poll, event: Ready) {
+    fn ready(&mut self, ifc: &mut dyn Interface, poll: &Poll, event: Ready) {
         if event.is_error() || event.is_hup() {
             let e = match self.listener.take_error() {
                 Ok(err) => err.map_or(NatError::Unknown, NatError::from),
@@ -102,12 +102,12 @@ impl NatState for TcpRendezvousServer {
         }
     }
 
-    fn terminate(&mut self, ifc: &mut Interface, poll: &Poll) {
+    fn terminate(&mut self, ifc: &mut dyn Interface, poll: &Poll) {
         let _ = ifc.remove_state(self.token);
         let _ = poll.deregister(&self.listener);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

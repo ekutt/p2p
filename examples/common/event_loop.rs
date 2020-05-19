@@ -13,8 +13,8 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 pub struct Core {
-    nat_states: HashMap<Token, Rc<RefCell<NatState>>>,
-    peer_states: HashMap<Token, Rc<RefCell<CoreState>>>,
+    nat_states: HashMap<Token, Rc<RefCell<dyn NatState>>>,
+    peer_states: HashMap<Token, Rc<RefCell<dyn CoreState>>>,
     core_timer: Timer<CoreTimer>,
     nat_timer: Timer<NatTimer>,
     token: usize,
@@ -30,8 +30,8 @@ impl Core {
     pub fn insert_peer_state(
         &mut self,
         token: Token,
-        state: Rc<RefCell<CoreState>>,
-    ) -> Result<(), (Rc<RefCell<CoreState>>, String)> {
+        state: Rc<RefCell<dyn CoreState>>,
+    ) -> Result<(), (Rc<RefCell<dyn CoreState>>, String)> {
         if let Entry::Vacant(ve) = self.peer_states.entry(token) {
             ve.insert(state);
             Ok(())
@@ -40,7 +40,7 @@ impl Core {
         }
     }
 
-    pub fn remove_peer_state(&mut self, token: Token) -> Option<Rc<RefCell<CoreState>>> {
+    pub fn remove_peer_state(&mut self, token: Token) -> Option<Rc<RefCell<dyn CoreState>>> {
         self.peer_states.remove(&token)
     }
 
@@ -49,7 +49,7 @@ impl Core {
     //     //self.udt_epoll_handle.clone()
     // }
 
-    pub fn peer_state(&mut self, token: Token) -> Option<Rc<RefCell<CoreState>>> {
+    pub fn peer_state(&mut self, token: Token) -> Option<Rc<RefCell<dyn CoreState>>> {
         self.peer_states.get(&token).cloned()
     }
 
@@ -95,8 +95,8 @@ impl Interface for Core {
     fn insert_state(
         &mut self,
         token: Token,
-        state: Rc<RefCell<NatState>>,
-    ) -> Result<(), (Rc<RefCell<NatState>>, String)> {
+        state: Rc<RefCell<dyn NatState>>,
+    ) -> Result<(), (Rc<RefCell<dyn NatState>>, String)> {
         if let Entry::Vacant(ve) = self.nat_states.entry(token) {
             ve.insert(state);
             Ok(())
@@ -105,11 +105,11 @@ impl Interface for Core {
         }
     }
 
-    fn remove_state(&mut self, token: Token) -> Option<Rc<RefCell<NatState>>> {
+    fn remove_state(&mut self, token: Token) -> Option<Rc<RefCell<dyn NatState>>> {
         self.nat_states.remove(&token)
     }
 
-    fn state(&mut self, token: Token) -> Option<Rc<RefCell<NatState>>> {
+    fn state(&mut self, token: Token) -> Option<Rc<RefCell<dyn NatState>>> {
         self.nat_states.get(&token).cloned()
     }
 
@@ -142,7 +142,7 @@ impl Interface for Core {
         &self.tx
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }
@@ -152,7 +152,7 @@ pub trait CoreState {
     fn write(&mut self, &mut Core, &Poll, Vec<u8>) {}
     fn timeout(&mut self, &mut Core, &Poll, u8) {}
     fn terminate(&mut self, &mut Core, &Poll);
-    fn as_any(&mut self) -> &mut Any;
+    fn as_any(&mut self) -> &mut dyn Any;
 }
 
 pub struct CoreTimer {
@@ -168,7 +168,7 @@ impl CoreTimer {
         }
     }
 }
-pub struct CoreMsg(Option<Box<FnMut(&mut Core, &Poll) + Send + 'static>>);
+pub struct CoreMsg(Option<Box<dyn FnMut(&mut Core, &Poll) + Send + 'static>>);
 impl CoreMsg {
     pub fn new<F: FnOnce(&mut Core, &Poll) + Send + 'static>(f: F) -> Self {
         let mut f = Some(f);

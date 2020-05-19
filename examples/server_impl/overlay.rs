@@ -81,7 +81,7 @@ impl CoreState for Overlay {
         let _ = core.remove_peer_state(self.token);
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

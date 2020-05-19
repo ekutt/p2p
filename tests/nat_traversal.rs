@@ -47,7 +47,7 @@ fn start_rendezvous_servers() -> Vec<EventLoop> {
 fn get_rendezvous_info(el: &EventLoop) -> mpsc::Receiver<(NatInfo, Res<(Handle, RendezvousInfo)>)> {
     let (tx, rx) = mpsc::channel();
     unwrap!(el.nat_tx.send(NatMsg::new(move |ifc, poll| {
-        let handler = move |_: &mut Interface, _: &Poll, (nat_info, res)| {
+        let handler = move |_: &mut dyn Interface, _: &Poll, (nat_info, res)| {
             unwrap!(tx.send((nat_info, res)));
         };
         let _mediator_token = unwrap!(HolePunchMediator::start(

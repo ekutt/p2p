@@ -17,7 +17,7 @@ use std::time::Duration;
 
 /// Simplified state machine implementation for tests.
 pub struct StateMachine {
-    pub nat_states: HashMap<Token, Rc<RefCell<NatState>>>,
+    pub nat_states: HashMap<Token, Rc<RefCell<dyn NatState>>>,
     pub timer: Timer<NatTimer>,
     pub token: usize,
     pub config: Config,
@@ -48,8 +48,8 @@ impl Interface for StateMachine {
     fn insert_state(
         &mut self,
         token: Token,
-        state: Rc<RefCell<NatState>>,
-    ) -> Result<(), (Rc<RefCell<NatState>>, String)> {
+        state: Rc<RefCell<dyn NatState>>,
+    ) -> Result<(), (Rc<RefCell<dyn NatState>>, String)> {
         if let Entry::Vacant(ve) = self.nat_states.entry(token) {
             let _ = ve.insert(state);
             Ok(())
@@ -58,11 +58,11 @@ impl Interface for StateMachine {
         }
     }
 
-    fn remove_state(&mut self, token: Token) -> Option<Rc<RefCell<NatState>>> {
+    fn remove_state(&mut self, token: Token) -> Option<Rc<RefCell<dyn NatState>>> {
         self.nat_states.remove(&token)
     }
 
-    fn state(&mut self, token: Token) -> Option<Rc<RefCell<NatState>>> {
+    fn state(&mut self, token: Token) -> Option<Rc<RefCell<dyn NatState>>> {
         self.nat_states.get(&token).cloned()
     }
 
@@ -95,7 +95,7 @@ impl Interface for StateMachine {
         &self.tx
     }
 
-    fn as_any(&mut self) -> &mut Any {
+    fn as_any(&mut self) -> &mut dyn Any {
         self
     }
 }

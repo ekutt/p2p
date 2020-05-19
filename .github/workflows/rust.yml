@@ -1,6 +1,6 @@
 name: Rust
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
@@ -8,6 +8,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Set Up Rust
+      run: |
+        rustup install stable
+        rustup default stable
+        rustc -Vv
+        cargo -Vv
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
